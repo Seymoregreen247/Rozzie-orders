@@ -56,6 +56,7 @@ td.size{font-weight:700;width:60px}
 td.chk,th.chk{width:74px;text-align:center}
 tr.is-done td{background:var(--done)}
 input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);cursor:pointer;vertical-align:middle}
+.also{font-size:.82rem;font-weight:600;color:var(--brand);margin-top:2px}
 .multi{font-size:.75rem;font-weight:600;color:var(--brand);margin-left:6px}
 .new{font-size:.72rem;font-weight:700;color:#fff;background:var(--brand);border-radius:4px;padding:1px 5px;margin-left:6px}
 .items,.contact{font-size:.88rem;color:var(--muted)}
@@ -162,13 +163,20 @@ function build(){
       const p=parseLine(ln); if(!p) return;
       c.total+=p.qty*p.price;
       c.lines.push(`${p.qty>1?p.qty+" ":""}${p.style==="crew"?"crew":"V-neck"} ${p.color} ${p.size}`);
-      for(let u=0;u<p.qty;u++)(items[p.style][p.color]=items[p.style][p.color]||[]).push({name:o.name,size:p.size,cust:key,id:safe(`${o.id}_${li}_${u}`),isNew});
+      for(let u=0;u<p.qty;u++)(items[p.style][p.color]=items[p.style][p.color]||[]).push({name:o.name,size:p.size,cust:key,id:safe(`${o.id}_${li}_${u}`),isNew,label:`${p.style==="crew"?"crew":"V-neck"} ${p.color} ${p.size}`});
     });
   });
   custs.forEach(c=>{if(c.ship)c.total+=10});
   return {items,custs:[...custs.values()].sort((a,b)=>a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))};
 }
 function box(k,label){return `<input type="checkbox" data-k="${k}" aria-label="${esc(label)}" ${checks[k]?"checked":""}>`}
+function alsoText(r,multi){
+  const all=multi.get(r.cust); if(!all) return "";
+  const others=all.filter(x=>x.id!==r.id), c={};
+  others.forEach(x=>c[x.label]=(c[x.label]||0)+1);
+  const txt=Object.keys(c).map(l=>(c[l]>1?c[l]+"× ":"")+l).join(", ");
+  return `<div class="also">+ also: ${esc(txt)}</div>`;
+}
 function renderGroups(el,groups,prefix,cols,multi){
   const colors=Object.keys(groups);
   if(!colors.length){el.innerHTML='<div class="empty">No shirts in this section yet.</div>';return}
@@ -179,7 +187,7 @@ function renderGroups(el,groups,prefix,cols,multi){
     return `<div class="color"><div class="color-head"><span class="swatch" style="background:${HEX[color]||"#ccc"}" aria-hidden="true"></span><h3>${esc(color)}</h3><span class="count">${rows.length}</span></div>
       <div class="sizes">Sizes: ${sizes}</div>
       <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Size</th>${cols.map(c=>`<th class="chk">${c}</th>`).join("")}</tr></thead><tbody>
-      ${rows.map(r=>`<tr data-row><td>${esc(r.name)}${multi.has(r.cust)?'<span class="multi">multiple shirts</span>':""}${r.isNew?'<span class="new">new</span>':""}</td><td class="size">${esc(r.size)}</td>
+      ${rows.map(r=>`<tr data-row><td>${esc(r.name)}${r.isNew?'<span class="new">new</span>':""}${alsoText(r,multi)}</td><td class="size">${esc(r.size)}</td>
         ${cols.map(c=>`<td class="chk">${box(`${prefix}_${r.id}_${safe(c)}`,`${c}: ${r.name} ${color} ${r.size}`)}</td>`).join("")}</tr>`).join("")}
       </tbody></table></div></div>`}).join("");
 }
@@ -206,7 +214,9 @@ function render(){
   const {items,custs}=built;
   const counts={};
   Object.values(items).forEach(g=>Object.values(g).forEach(rows=>rows.forEach(r=>counts[r.cust]=(counts[r.cust]||0)+1)));
-  const multi=new Set(Object.keys(counts).filter(k=>counts[k]>1));
+  const byCust={};
+  Object.values(items).forEach(g=>Object.values(g).forEach(rows=>rows.forEach(r=>(byCust[r.cust]=byCust[r.cust]||[]).push(r))));
+  const multi=new Map(Object.keys(byCust).filter(k=>byCust[k].length>1).map(k=>[k,byCust[k]]));
   const nCrew=Object.values(items.crew).flat().length, nV=Object.values(items.vneck).flat().length;
   const total=custs.reduce((s,c)=>s+c.total,0);
   document.getElementById("totals").innerHTML=`<span><b>${nCrew+nV}</b> shirts</span><span><b>${custs.length}</b> customers</span><span><b>$${total}</b> total</span><span><b>${nCrew}</b> crew · <b>${nV}</b> V-neck</span>`;
