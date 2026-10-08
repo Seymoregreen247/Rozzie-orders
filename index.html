@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rozzie Orders</title>
+<meta name="theme-color" content="#1f6b3a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rozzie Orders">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#fff;--ink:#1c2b22;--muted:#5d6b62;--line:#d9ded9;--row:#f4f6f3;--brand:#1f6b3a;--done:#e7f2ea;--warn:#8a5a00;--warnbg:#fff4dc;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#141a16;--ink:#e8eee9;--muted:#9aa8a0;--line:#2c3630;--row:#1b231e;--brand:#5fc183;--done:#1d3326;--warn:#f0c46a;--warnbg:#2e2614}}
+:root[data-theme="dark"]{--paper:#141a16;--ink:#e8eee9;--muted:#9aa8a0;--line:#2c3630;--row:#1b231e;--brand:#5fc183;--done:#1d3326;--warn:#f0c46a;--warnbg:#2e2614}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Barlow,"Helvetica Neue",Arial,sans-serif;font-size:16px;line-height:1.45}
+main{max-width:780px;margin:0 auto;padding:20px 16px 48px}
+h1,h2,h3{font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif;margin:0;line-height:1.05}
+h1{font-size:2.3rem}
+.sub{color:var(--muted);margin:4px 0 12px}
+.totals{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:600}
+.totals b{font-size:1.25rem;color:var(--brand)}
+.sync{margin:12px 0 4px;padding:8px 12px;border-radius:6px;background:var(--row);font-size:.92rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sync.warn{background:var(--warnbg);color:var(--warn)}
+.sync .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.sync.ok .dot{background:var(--brand)}
+.tools{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}
+button{font:inherit;font-weight:600;border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+section{margin-top:30px}
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:4px}
+h2{font-size:1.6rem}
+.note{color:var(--muted);font-size:.92rem;margin:6px 0 0}
+.prog{font-weight:600;color:var(--muted);font-size:.92rem;text-align:right}
+.color{margin-top:16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.color-head{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--row)}
+.swatch{width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(0,0,0,.25);flex:none}
+.color-head h3{font-size:1.3rem;flex:1}
+.color-head .count{font-weight:700}
+.sizes{font-size:.88rem;color:var(--muted);padding:6px 12px 2px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:.8rem;font-weight:600;color:var(--muted);text-align:left;padding:6px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+td.size{font-weight:700;width:60px}
+td.chk,th.chk{width:74px;text-align:center}
+tr.is-done td{background:var(--done)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);cursor:pointer;vertical-align:middle}
+.multi{font-size:.75rem;font-weight:600;color:var(--brand);margin-left:6px}
+.new{font-size:.72rem;font-weight:700;color:#fff;background:var(--brand);border-radius:4px;padding:1px 5px;margin-left:6px}
+.items,.contact{font-size:.88rem;color:var(--muted)}
+.contact a{color:inherit}
+td.amt{font-weight:700;white-space:nowrap}
+.mail{display:inline-block;margin-top:4px;font-size:.85rem;font-weight:600;color:var(--brand)}
+.list-box{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--paper);color:var(--ink)}
+.empty{padding:14px 12px;color:var(--muted)}
+@media (max-width:520px){h1{font-size:1.9rem}td,th{padding:8px}td.chk,th.chk{width:54px}}
+@media print{:root{--paper:#fff;--ink:#000;--muted:#444;--line:#bbb;--row:#f1f1f1;--done:#fff}.tools,.sync,.mail,.list-box,#emails-sec{display:none}main{max-width:none;padding:0}.color{break-inside:avoid}}
+#lock{position:fixed;inset:0;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;z-index:9}
+#lock[hidden]{display:none}
+#lock form{max-width:320px;width:100%;text-align:center}
+#lock h1{color:#fff;margin-bottom:6px}
+#lock p{margin:0 0 16px;opacity:.9}
+#lock input{width:100%;font:inherit;font-size:1.6rem;text-align:center;letter-spacing:.3em;padding:10px;border-radius:8px;border:none;margin-bottom:12px}
+#lock button{width:100%;background:#F6D24A;border-color:#F6D24A;color:#1c2b22;font-size:1.1rem;padding:10px}
+#lock .err{color:#ffe08a;min-height:1.4em;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="lock" hidden><form id="lock-form"><h1>Rozzie Orders</h1><p>Enter your PIN to see orders.</p>
+<input id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN"><button type="submit">Open</button><div class="err" id="lock-err" role="alert"></div></form></div>
+<main>
+  <h1>I Bike Roslindale shirt checklist</h1>
+  <p class="sub">RozzieBikes group order · Seymore Green, 35 Poplar St · group pricing ends Oct 15</p>
+  <div class="totals" id="totals"></div>
+  <div class="sync" id="sync"><span class="dot"></span><span id="sync-text">Loading orders…</span></div>
+  <div class="tools">
+    <button class="primary" id="refresh">Refresh orders</button>
+    <button onclick="window.print()">Print checklist</button>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>Unisex crew</h2><span class="prog" id="prog-crew"></span></div>
+    <div id="crew"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Ladies' V-neck</h2><span class="prog" id="prog-vneck"></span></div>
+    <p class="note">Ordered separately from the other supplier. Check "Ordered" when the blanks are on the way.</p>
+    <div id="vneck"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Customers</h2><span class="prog" id="prog-cust"></span></div>
+    <p class="note">Tap "Email: ready for pickup" to open a thank-you email with their order filled in. It marks them as emailed.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Customer</th><th>Total</th><th class="chk">Paid</th><th class="chk">Emailed</th><th class="chk">Picked up</th></tr></thead>
+      <tbody id="cust"></tbody>
+    </table></div>
+  </section>
+
+  <section id="emails-sec">
+    <div class="sec-head"><h2>Rozzie customer list</h2><span class="prog" id="email-count"></span></div>
+    <p class="note">Everyone who ordered, for future Rozzie drops, stickers, and new gear.</p>
+    <div class="list-box">
+      <textarea id="email-list" readonly aria-label="Customer email list"></textarea>
+      <div class="tools" style="margin-top:8px"><button id="copy-emails">Copy emails</button><button id="copy-csv">Copy name, email, phone</button></div>
+    </div>
+  </section>
+</main>
+<script>
+const HEX={"Daisy":"#F6D24A","Carolina Blue":"#7BAFD4","Light Blue":"#B9D3EA","Yellow":"#F7E35A","Chill":"#C6DCE8"};
+const SIZE_ORDER=["XS","S","M","L","XL","2XL","3XL","XXL","XXXL"];
+const LS={pin:"rozzie-pin",orders:"rozzie-orders-cache",checks:"rozzie-checks-cache",seen:"rozzie-seen-ids"};
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+let pin=ls.get(LS.pin,""), orders=ls.get(LS.orders,[]), checks=ls.get(LS.checks,{});
+let seenIds=new Set(ls.get(LS.seen,[])), firstLoad=seenIds.size===0;
+
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safe=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,"_");
+const fmtPhone=p=>{const d=String(p).replace(/\D/g,"").replace(/^1(?=\d{10}$)/,"");return d.length===10?`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`:p};
+const digits=p=>String(p).replace(/\D/g,"");
+
+function parseLine(line){
+  const m=line.match(/^(\d+)\s*x\s*(Unisex crew|Ladies' V-neck)\s+(.+?)\s+(\S+)\s*@\s*\$(\d+)/i);
+  if(!m) return null;
+  return {qty:+m[1],style:/v-neck/i.test(m[2])?"vneck":"crew",color:m[3].trim(),size:m[4].toUpperCase(),price:+m[5]};
+}
+function fromSubmissions(subs){
+  const seen=new Map();
+  subs.slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at))).forEach(s=>{
+    const d=s.data||{};
+    const lines=String(d.order_details||"").split("\n").map(x=>x.trim()).filter(x=>parseLine(x));
+    if(!lines.length) return;
+    const email=String(d.email||s.email||"").trim().toLowerCase();
+    seen.set(email+"|"+lines.join("|"),{id:d.order_id||s.id,name:d.name||s.name||"",email,phone:d.phone||"",lines,fulfillment:d.fulfillment||"Pickup",created:s.created_at||""});
+  });
+  return [...seen.values()];
+}
+
+function build(){
+  const items={crew:{},vneck:{}}, custs=new Map();
+  orders.forEach(o=>{
+    const key=safe(o.email||o.name), isNew=!firstLoad&&!seenIds.has(o.id);
+    if(!custs.has(key)) custs.set(key,{key,name:o.name,email:o.email,phone:o.phone,lines:[],total:0,isNew:false,ship:false});
+    const c=custs.get(key);
+    if(isNew) c.isNew=true;
+    if(/ship/i.test(o.fulfillment)) c.ship=true;
+    o.lines.forEach((ln,li)=>{
+      const p=parseLine(ln); if(!p) return;
+      c.total+=p.qty*p.price;
+      c.lines.push(`${p.qty>1?p.qty+" ":""}${p.style==="crew"?"crew":"V-neck"} ${p.color} ${p.size}`);
+      for(let u=0;u<p.qty;u++)(items[p.style][p.color]=items[p.style][p.color]||[]).push({name:o.name,size:p.size,cust:key,id:safe(`${o.id}_${li}_${u}`),isNew});
+    });
+  });
+  custs.forEach(c=>{if(c.ship)c.total+=10});
+  return {items,custs:[...custs.values()].sort((a,b)=>a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()))};
+}
+function box(k,label){return `<input type="checkbox" data-k="${k}" aria-label="${esc(label)}" ${checks[k]?"checked":""}>`}
+function renderGroups(el,groups,prefix,cols,multi){
+  const colors=Object.keys(groups);
+  if(!colors.length){el.innerHTML='<div class="empty">No shirts in this section yet.</div>';return}
+  el.innerHTML=colors.map(color=>{
+    const rows=groups[color].sort((a,b)=>SIZE_ORDER.indexOf(a.size)-SIZE_ORDER.indexOf(b.size)||a.name.localeCompare(b.name));
+    const cnt={};rows.forEach(r=>cnt[r.size]=(cnt[r.size]||0)+1);
+    const sizes=Object.keys(cnt).sort((a,b)=>SIZE_ORDER.indexOf(a)-SIZE_ORDER.indexOf(b)).map(s=>`${s} ×${cnt[s]}`).join(", ");
+    return `<div class="color"><div class="color-head"><span class="swatch" style="background:${HEX[color]||"#ccc"}" aria-hidden="true"></span><h3>${esc(color)}</h3><span class="count">${rows.length}</span></div>
+      <div class="sizes">Sizes: ${sizes}</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Size</th>${cols.map(c=>`<th class="chk">${c}</th>`).join("")}</tr></thead><tbody>
+      ${rows.map(r=>`<tr data-row><td>${esc(r.name)}${multi.has(r.cust)?'<span class="multi">multiple shirts</span>':""}${r.isNew?'<span class="new">new</span>':""}</td><td class="size">${esc(r.size)}</td>
+        ${cols.map(c=>`<td class="chk">${box(`${prefix}_${r.id}_${safe(c)}`,`${c}: ${r.name} ${color} ${r.size}`)}</td>`).join("")}</tr>`).join("")}
+      </tbody></table></div></div>`}).join("");
+}
+function pickupMail(c){
+  const first=c.name.split(" ")[0]||"there";
+  const subject="Your I Bike Roslindale shirt is ready for pickup";
+  const body=`Hi ${first},
+
+Good news: your I Bike Roslindale order is printed and ready for pickup!
+
+Your order: ${c.lines.join(", ")}
+
+Pick it up at Seymore Green, 35 Poplar St, Roslindale, Monday to Saturday, 10am to 6pm.
+
+Thank you for riding with RozzieBikes and supporting a Rozzie business. Keep an eye out for new Rozzie Bike gear and stickers coming soon.
+
+Seymore Green
+844-4-SEYMOR (844-473-9667)`;
+  return `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+let built=null;
+function render(){
+  built=build();
+  const {items,custs}=built;
+  const counts={};
+  Object.values(items).forEach(g=>Object.values(g).forEach(rows=>rows.forEach(r=>counts[r.cust]=(counts[r.cust]||0)+1)));
+  const multi=new Set(Object.keys(counts).filter(k=>counts[k]>1));
+  const nCrew=Object.values(items.crew).flat().length, nV=Object.values(items.vneck).flat().length;
+  const total=custs.reduce((s,c)=>s+c.total,0);
+  document.getElementById("totals").innerHTML=`<span><b>${nCrew+nV}</b> shirts</span><span><b>${custs.length}</b> customers</span><span><b>$${total}</b> total</span><span><b>${nCrew}</b> crew · <b>${nV}</b> V-neck</span>`;
+  renderGroups(document.getElementById("crew"),items.crew,"crew",["Printed"],multi);
+  renderGroups(document.getElementById("vneck"),items.vneck,"v",["Ordered","Printed"],multi);
+  document.getElementById("cust").innerHTML=custs.length?custs.map(c=>`<tr data-row>
+    <td><b>${esc(c.name)}</b>${c.isNew?'<span class="new">new</span>':""}<br><span class="items">${esc(c.lines.join(" · "))}${c.ship?" · ships (+$10)":""}</span><br>
+      <span class="contact"><a href="sms:${digits(c.phone)}">${esc(fmtPhone(c.phone))}</a> · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></span><br>
+      <a class="mail" href="${pickupMail(c)}" data-mail="${c.key}">Email: ready for pickup</a></td>
+    <td class="amt">$${c.total}</td>
+    <td class="chk">${box(`c_${c.key}_paid`,`Paid: ${c.name}`)}</td>
+    <td class="chk">${box(`c_${c.key}_emailed`,`Emailed: ${c.name}`)}</td>
+    <td class="chk">${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">No orders yet.</td></tr>';
+  document.getElementById("email-list").value=custs.map(c=>c.email).filter(Boolean).join(", ");
+  document.getElementById("email-count").textContent=`${custs.length} people`;
+  refreshMarks();
+}
+function refreshMarks(){
+  document.querySelectorAll("tr[data-row]").forEach(tr=>{const b=[...tr.querySelectorAll("input")];tr.classList.toggle("is-done",b.length&&b.every(x=>x.checked))});
+  const count=(sel,label)=>{const b=[...document.querySelectorAll(sel)];return `${b.filter(x=>x.checked).length}/${b.length} ${label}`};
+  document.getElementById("prog-crew").textContent=count('#crew input','printed');
+  document.getElementById("prog-vneck").textContent=count('#vneck input[data-k$="_ordered"]','ordered')+" · "+count('#vneck input[data-k$="_printed"]','printed');
+  const paid=built?built.custs.filter(c=>checks[`c_${c.key}_paid`]).reduce((s,c)=>s+c.total,0):0;
+  document.getElementById("prog-cust").textContent=count('#cust input[data-k$="_paid"]','paid')+` ($${paid}) · `+count('#cust input[data-k$="_picked"]','picked up');
+}
+
+// ---- Server calls (PIN-protected) ----
+const syncEl=document.getElementById("sync"), syncText=document.getElementById("sync-text"), refreshBtn=document.getElementById("refresh");
+function status(msg,kind){syncEl.className="sync"+(kind?" "+kind:"");syncText.textContent=msg}
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{"x-app-pin":pin,"content-type":"application/json",...(opts.headers||{})}});
+  if(r.status===401){lock("That PIN didn't work. Try again.");throw new Error("pin")}
+  if(!r.ok) throw new Error("http "+r.status);
+  return r.json();
+}
+let pending={}, timer=null;
+function persist(k,v){
+  checks[k]=v; ls.set(LS.checks,checks);
+  pending[k]=v; clearTimeout(timer);
+  timer=setTimeout(async()=>{const batch=pending;pending={};
+    try{checks={...(await api("/api/checks",{method:"POST",body:JSON.stringify(batch)})),...pending};ls.set(LS.checks,checks)}
+    catch(e){Object.assign(pending,batch);status("Couldn't save to the cloud. Your checks are saved on this device and will sync next time.","warn")}},500);
+}
+let busy=false;
+async function loadAll(){
+  if(busy||!pin) return; busy=true; refreshBtn.disabled=true; status("Checking for new orders…");
+  try{
+    const [subs,serverChecks]=await Promise.all([api("/api/orders"),api("/api/checks")]);
+    orders=fromSubmissions(subs); ls.set(LS.orders,orders);
+    checks={...serverChecks,...pending}; ls.set(LS.checks,checks);
+    render();
+    if(firstLoad){firstLoad=false}
+    const ids=orders.map(o=>o.id); ids.forEach(i=>seenIds.add(i)); ls.set(LS.seen,[...seenIds]);
+    status(`Up to date · ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`,"ok");
+  }catch(e){
+    if(e.message!=="pin") status(navigator.onLine?"Couldn't reach the server. Showing your last saved list.":"You're offline. Showing your last saved list.","warn");
+  }finally{busy=false;refreshBtn.disabled=false}
+}
+refreshBtn.onclick=loadAll;
+
+document.addEventListener("change",e=>{if(e.target.matches("input[type=checkbox][data-k]")){persist(e.target.dataset.k,e.target.checked);refreshMarks()}});
+document.addEventListener("click",e=>{const a=e.target.closest("a[data-mail]");if(a){const k=`c_${a.dataset.mail}_emailed`;persist(k,true);const b=document.querySelector(`input[data-k="${k}"]`);if(b)b.checked=true;refreshMarks()}});
+async function copyText(t,btn,label){
+  try{await navigator.clipboard.writeText(t);btn.textContent="Copied"}
+  catch(e){const ta=document.getElementById("email-list");ta.value=t;ta.select();btn.textContent="Selected, press copy"}
+  setTimeout(()=>{btn.textContent=label},2000);
+}
+document.getElementById("copy-emails").onclick=e=>copyText(built.custs.map(c=>c.email).join(", "),e.target,"Copy emails");
+document.getElementById("copy-csv").onclick=e=>copyText("Name,Email,Phone\n"+built.custs.map(c=>`${c.name},${c.email},${fmtPhone(c.phone)}`).join("\n"),e.target,"Copy name, email, phone");
+
+// ---- PIN lock ----
+const lockEl=document.getElementById("lock");
+function lock(msg){pin="";ls.set(LS.pin,"");lockEl.hidden=false;document.getElementById("lock-err").textContent=msg||"";document.getElementById("pin").focus()}
+document.getElementById("lock-form").onsubmit=e=>{e.preventDefault();pin=document.getElementById("pin").value.trim();if(!pin)return;ls.set(LS.pin,pin);lockEl.hidden=true;loadAll()};
+
+render();
+if(pin){lockEl.hidden=true;loadAll()}else{lock()}
+setInterval(()=>{if(!document.hidden)loadAll()},3*60*1000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadAll()});
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+</script>
+</body>
+</html>
