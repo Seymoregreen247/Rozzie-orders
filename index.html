@@ -89,6 +89,7 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
   <h1>I Bike Roslindale shirt checklist</h1>
   <p class="sub">RozzieBikes group order · Seymore Green, 35 Poplar St · group pricing ends Oct 15</p>
   <div class="totals" id="totals"></div>
+  <p class="note" id="payment-summary" aria-live="polite"></p>
   <div class="sync" id="sync"><span class="dot"></span><span id="sync-text">Loading orders…</span></div>
   <div class="tools">
     <button class="primary" id="refresh">Refresh orders</button>
@@ -108,9 +109,10 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
 
   <section>
     <div class="sec-head"><h2>Customers</h2><span class="prog" id="prog-cust"></span></div>
-    <p class="note">Tap "Email: ready for pickup" to open a thank-you email with their order filled in. It marks them as emailed.</p>
+    <p class="note">Orders are NOT payments. Verify money received before checking Paid. Select the payment method only after verifying receipt. Unpaid orders must not be sent to production.</p>
+    <div class="tools"><button id="show-unpaid" type="button">Show unpaid only</button><button id="show-all" type="button">Show all customers</button></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Customer</th><th>Total</th><th class="chk">Paid</th><th class="chk">Emailed</th><th class="chk">Picked up</th></tr></thead>
+      <thead><tr><th>Customer</th><th>Total</th><th class="chk">Paid (verified)</th><th>Method</th><th class="chk">Emailed</th><th class="chk">Picked up</th></tr></thead>
       <tbody id="cust"></tbody>
     </table></div>
   </section>
@@ -140,6 +142,7 @@ const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.par
 
 let pin=ls.get(LS.pin,""), orders=ls.get(LS.orders,[]), checks=ls.get(LS.checks,{});
 let seenIds=new Set(ls.get(LS.seen,[])), firstLoad=seenIds.size===0;
+let unpaidOnly=false;
 
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safe=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,"_");
@@ -233,17 +236,20 @@ function render(){
   const multi=new Map(Object.keys(byCust).filter(k=>byCust[k].length>1).map(k=>[k,byCust[k]]));
   const nCrew=Object.values(items.crew).flat().length, nV=Object.values(items.vneck).flat().length;
   const total=custs.reduce((s,c)=>s+c.total,0);
-  document.getElementById("totals").innerHTML=`<span><b>${nCrew+nV}</b> shirts</span><span><b>${custs.length}</b> customers</span><span><b>$${total}</b> total</span><span><b>${nCrew}</b> crew · <b>${nV}</b> V-neck</span>`;
+  const collected=custs.filter(c=>checks[`c_${c.key}_paid`]).reduce((s,c)=>s+c.total,0);
+  document.getElementById("payment-summary").textContent=`Order value: ${total.toFixed(2)} · Verified collected: ${collected.toFixed(2)} · Unverified / outstanding: ${(total-collected).toFixed(2)}. Payment totals reflect only manually confirmed Paid checks; verify older checks against receipts.`;
+  document.getElementById("totals").innerHTML=`<span><b>${nCrew+nV}</b> shirts</span><span><b>${custs.length}</b> customers</span><span><b>${total}</b> orders (not collected)</span><span><b>${nCrew}</b> crew · <b>${nV}</b> V-neck</span>`;
   renderGroups(document.getElementById("crew"),items.crew,"crew",["Printed"],multi);
   renderGroups(document.getElementById("vneck"),items.vneck,"v",["Ordered","Printed"],multi);
-  document.getElementById("cust").innerHTML=custs.length?custs.map(c=>`<tr data-row>
+  document.getElementById("cust").innerHTML=custs.length?custs.filter(c=>!unpaidOnly||!checks[`c_${c.key}_paid`]).map(c=>`<tr data-row>
     <td><b>${esc(c.name)}</b>${c.isNew?'<span class="new">new</span>':""}<br><span class="items">${esc(c.lines.join(" · "))}${c.ship?" · ships (+$10)":""}</span>${c.interest.size?`<br><span class="wants">Wants: ${esc([...c.interest].join(", "))}</span>`:""}<br>
       <span class="contact"><a href="sms:${digits(c.phone)}">${esc(fmtPhone(c.phone))}</a> · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></span><br>
       <a class="mail" href="${pickupMail(c)}" data-mail="${c.key}">Email: ready for pickup</a></td>
     <td class="amt">$${c.total}</td>
-    <td class="chk">${box(`c_${c.key}_paid`,`Paid: ${c.name}`)}</td>
+    <td class="chk">${box(`c_${c.key}_paid`,`Payment verified: ${c.name}`)}<div class="items">${checks[`c_${c.key}_paid`]?"Verified":"UNPAID / unverified"}</div></td>
+    <td><select aria-label="Payment method for ${esc(c.name)}" data-method="${esc(c.key)}"><option value="">Not recorded</option>${["Venmo","Cash App","In Person","Other"].map(m=>`<option value="${m}" ${checks[`c_${c.key}_method`]===m?"selected":""}>${m}</option>`).join("")}</select></td>
     <td class="chk">${box(`c_${c.key}_emailed`,`Emailed: ${c.name}`)}</td>
-    <td class="chk">${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">No orders yet.</td></tr>';
+    <td class="chk">${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`).join(""):'<tr><td colspan="6" class="empty">No matching orders.</td></tr>';
   const gc={};custs.forEach(c=>c.interest.forEach(x=>{(gc[x]=gc[x]||[]).push(c.name)}));
   const gk=Object.keys(gc).sort((a,b)=>gc[b].length-gc[a].length);
   document.getElementById("gear").innerHTML=gk.length?gk.map(k=>`<div class="gear-row"><b>${esc(k)}</b> <span class="gear-n">${gc[k].length}</span><div class="items">${esc(gc[k].join(", "))}</div></div>`).join(""):'<div class="empty">No gear requests yet.</div>';
@@ -257,6 +263,7 @@ function refreshMarks(){
   document.getElementById("prog-crew").textContent=count('#crew input','printed');
   document.getElementById("prog-vneck").textContent=count('#vneck input[data-k$="_ordered"]','ordered')+" · "+count('#vneck input[data-k$="_printed"]','printed');
   const paid=built?built.custs.filter(c=>checks[`c_${c.key}_paid`]).reduce((s,c)=>s+c.total,0):0;
+  document.getElementById("payment-summary").textContent=`Order value: ${built.custs.reduce((s,c)=>s+c.total,0).toFixed(2)} · Verified collected: ${paid.toFixed(2)} · Unverified / outstanding: ${(built.custs.reduce((s,c)=>s+c.total,0)-paid).toFixed(2)}. Verify older Paid checks against actual receipts.`;
   document.getElementById("prog-cust").textContent=count('#cust input[data-k$="_paid"]','paid')+` ($${paid}) · `+count('#cust input[data-k$="_picked"]','picked up');
 }
 
@@ -294,7 +301,20 @@ async function loadAll(){
 }
 refreshBtn.onclick=loadAll;
 
-document.addEventListener("change",e=>{if(e.target.matches("input[type=checkbox][data-k]")){persist(e.target.dataset.k,e.target.checked);refreshMarks()}});
+document.addEventListener("change",e=>{
+  if(e.target.matches("select[data-method]")){persist(`c_${e.target.dataset.method}_method`,e.target.value);return}
+  if(e.target.matches("input[type=checkbox][data-k]")){
+    const k=e.target.dataset.k;
+    if(k.endsWith("_paid")&&e.target.checked&&!confirm("Have you personally verified this payment was RECEIVED? A submitted order or Venmo link click is not proof.")){e.target.checked=false;return}
+    if((k.startsWith("crew_")||k.startsWith("v_"))&&e.target.checked){
+      const match=built&&built.custs.find(c=>k.includes("_"+safe(c.key)+"_"));
+      if(match&&!checks[`c_${match.key}_paid`]){alert("Payment not verified. Do not order or print this shirt yet.");e.target.checked=false;return}
+    }
+    persist(k,e.target.checked);if(k.endsWith("_paid"))render();else refreshMarks();
+  }
+});
+document.getElementById("show-unpaid").onclick=()=>{unpaidOnly=true;render()};
+document.getElementById("show-all").onclick=()=>{unpaidOnly=false;render()};
 document.addEventListener("click",e=>{const a=e.target.closest("a[data-mail]");if(a){const k=`c_${a.dataset.mail}_emailed`;persist(k,true);const b=document.querySelector(`input[data-k="${k}"]`);if(b)b.checked=true;refreshMarks()}});
 async function copyText(t,btn,label){
   try{await navigator.clipboard.writeText(t);btn.textContent="Copied"}
