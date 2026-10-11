@@ -307,7 +307,10 @@ document.addEventListener("change",e=>{
     const k=e.target.dataset.k;
     if(k.endsWith("_paid")&&e.target.checked&&!confirm("Have you personally verified this payment was RECEIVED? A submitted order or Venmo link click is not proof.")){e.target.checked=false;return}
     if((k.startsWith("crew_")||k.startsWith("v_"))&&e.target.checked){
-      const match=built&&built.custs.find(c=>k.includes("_"+safe(c.key)+"_"));
+      const rowId=k.replace(/^(crew_|v_)/,"").replace(/_(ordered|printed)$/,"");
+      const shirtRows=built?Object.values(built.items).flatMap(g=>Object.values(g).flat()):[];
+      const shirt=shirtRows.find(r=>r.id===rowId);
+      const match=shirt&&built.custs.find(c=>c.key===shirt.cust);
       if(match&&!checks[`c_${match.key}_paid`]){alert("Payment not verified. Do not order or print this shirt yet.");e.target.checked=false;return}
     }
     persist(k,e.target.checked);if(k.endsWith("_paid"))render();else refreshMarks();
