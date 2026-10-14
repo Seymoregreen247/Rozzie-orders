@@ -80,6 +80,7 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
 #lock input{width:100%;font:inherit;font-size:1.6rem;text-align:center;letter-spacing:.3em;padding:10px;border-radius:8px;border:none;margin-bottom:12px}
 #lock button{width:100%;background:#F6D24A;border-color:#F6D24A;color:#1c2b22;font-size:1.1rem;padding:10px}
 #lock .err{color:#ffe08a;min-height:1.4em;margin-top:8px}
+.pay-group{border:1px solid var(--line);border-radius:8px;margin-top:14px;overflow:hidden}.pay-group h3{padding:12px;background:var(--row)}.pay-group.paid{border-left:6px solid #27834a}.pay-group.unpaid{border-left:6px solid #bb3838}.pay-group.review{border-left:6px solid #b88014}.pay-badge{font-weight:700}.recon-note{padding:10px;background:var(--warnbg);border-radius:6px}.summary-cards{display:flex;flex-wrap:wrap;gap:12px}.summary-cards div{padding:12px;background:var(--row);border-radius:8px;flex:1;min-width:150px}
 </style>
 </head>
 <body>
@@ -96,7 +97,13 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
     <button onclick="window.print()">Print checklist</button>
   </div>
 
-  <section>
+  <section id="payment-panel"><div class="sec-head"><h2>Payments &amp; customer emails</h2></div>
+<p class="note">Import the private reconciliation file once to apply verified payments. Repeat imports do not add payments twice.</p>
+<div class="tools"><button id="import-payments">Import verified payments</button><input id="payment-file" type="file" accept=".json,application/json" hidden></div>
+<p id="import-status" class="note" role="status"></p>
+<p class="recon-note">Pickup emails: wait until Friday, October 16, and confirm every item in the customer's order is printed. Opening an email draft does not mark it sent.</p>
+<div id="recon-extras"></div><div id="payment-groups"></div></section>
+<section>
     <div class="sec-head"><h2>Unisex crew</h2><span class="prog" id="prog-crew"></span></div>
     <div id="crew"></div>
   </section>
@@ -241,15 +248,8 @@ function render(){
   document.getElementById("totals").innerHTML=`<span><b>${nCrew+nV}</b> shirts</span><span><b>${custs.length}</b> customers</span><span><b>${total}</b> orders (not collected)</span><span><b>${nCrew}</b> crew · <b>${nV}</b> V-neck</span>`;
   renderGroups(document.getElementById("crew"),items.crew,"crew",["Printed"],multi);
   renderGroups(document.getElementById("vneck"),items.vneck,"v",["Ordered","Printed"],multi);
-  document.getElementById("cust").innerHTML=custs.length?custs.filter(c=>!unpaidOnly||!checks[`c_${c.key}_paid`]).map(c=>`<tr data-row>
-    <td><b>${esc(c.name)}</b>${c.isNew?'<span class="new">new</span>':""}<br><span class="items">${esc(c.lines.join(" · "))}${c.ship?" · ships (+$10)":""}</span>${c.interest.size?`<br><span class="wants">Wants: ${esc([...c.interest].join(", "))}</span>`:""}<br>
-      <span class="contact"><a href="sms:${digits(c.phone)}">${esc(fmtPhone(c.phone))}</a> · <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></span><br>
-      <a class="mail" href="${pickupMail(c)}" data-mail="${c.key}">Email: ready for pickup</a></td>
-    <td class="amt">$${c.total}</td>
-    <td class="chk">${box(`c_${c.key}_paid`,`Payment verified: ${c.name}`)}<div class="items">${checks[`c_${c.key}_paid`]?"Verified":"UNPAID / unverified"}</div></td>
-    <td><select aria-label="Payment method for ${esc(c.name)}" data-method="${esc(c.key)}"><option value="">Not recorded</option>${["Venmo","Cash App","In Person","Other"].map(m=>`<option value="${m}" ${checks[`c_${c.key}_method`]===m?"selected":""}>${m}</option>`).join("")}</select></td>
-    <td class="chk">${box(`c_${c.key}_emailed`,`Emailed: ${c.name}`)}</td>
-    <td class="chk">${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`).join(""):'<tr><td colspan="6" class="empty">No matching orders.</td></tr>';
+  document.getElementById("cust").innerHTML='<tr><td colspan="6">Use the separated payment lists above. All customers remain recorded.</td></tr>';
+  renderPaymentGroups(custs);
   const gc={};custs.forEach(c=>c.interest.forEach(x=>{(gc[x]=gc[x]||[]).push(c.name)}));
   const gk=Object.keys(gc).sort((a,b)=>gc[b].length-gc[a].length);
   document.getElementById("gear").innerHTML=gk.length?gk.map(k=>`<div class="gear-row"><b>${esc(k)}</b> <span class="gear-n">${gc[k].length}</span><div class="items">${esc(gc[k].join(", "))}</div></div>`).join(""):'<div class="empty">No gear requests yet.</div>';
@@ -262,9 +262,7 @@ function refreshMarks(){
   const count=(sel,label)=>{const b=[...document.querySelectorAll(sel)];return `${b.filter(x=>x.checked).length}/${b.length} ${label}`};
   document.getElementById("prog-crew").textContent=count('#crew input','printed');
   document.getElementById("prog-vneck").textContent=count('#vneck input[data-k$="_ordered"]','ordered')+" · "+count('#vneck input[data-k$="_printed"]','printed');
-  const paid=built?built.custs.filter(c=>checks[`c_${c.key}_paid`]).reduce((s,c)=>s+c.total,0):0;
-  document.getElementById("payment-summary").textContent=`Order value: ${built.custs.reduce((s,c)=>s+c.total,0).toFixed(2)} · Verified collected: ${paid.toFixed(2)} · Unverified / outstanding: ${(built.custs.reduce((s,c)=>s+c.total,0)-paid).toFixed(2)}. Verify older Paid checks against actual receipts.`;
-  document.getElementById("prog-cust").textContent=count('#cust input[data-k$="_paid"]','paid')+` ($${paid}) · `+count('#cust input[data-k$="_picked"]','picked up');
+  if(built) renderPaymentGroups(built.custs);
 }
 
 // ---- Server calls (PIN-protected) ----
@@ -311,14 +309,15 @@ document.addEventListener("change",e=>{
       const shirtRows=built?Object.values(built.items).flatMap(g=>Object.values(g).flat()):[];
       const shirt=shirtRows.find(r=>r.id===rowId);
       const match=shirt&&built.custs.find(c=>c.key===shirt.cust);
-      if(match&&!checks[`c_${match.key}_paid`]){alert("Payment not verified. Do not order or print this shirt yet.");e.target.checked=false;return}
+      if(match&&paymentInfo(match).status!=="paid"){alert("Payment not verified. Do not order or print this shirt yet.");e.target.checked=false;return}
     }
+    if(k.endsWith("_paid")&&checks[k.replace(/_paid$/,"_receipt")]){alert("This status comes from an imported receipt. Update the payment reconciliation to change its amount or review status.");render();return;}
     persist(k,e.target.checked);if(k.endsWith("_paid"))render();else refreshMarks();
   }
 });
 document.getElementById("show-unpaid").onclick=()=>{unpaidOnly=true;render()};
 document.getElementById("show-all").onclick=()=>{unpaidOnly=false;render()};
-document.addEventListener("click",e=>{const a=e.target.closest("a[data-mail]");if(a){const k=`c_${a.dataset.mail}_emailed`;persist(k,true);const b=document.querySelector(`input[data-k="${k}"]`);if(b)b.checked=true;refreshMarks()}});
+
 async function copyText(t,btn,label){
   try{await navigator.clipboard.writeText(t);btn.textContent="Copied"}
   catch(e){const ta=document.getElementById("email-list");ta.value=t;ta.select();btn.textContent="Selected, press copy"}
@@ -326,6 +325,63 @@ async function copyText(t,btn,label){
 }
 document.getElementById("copy-emails").onclick=e=>copyText(built.custs.map(c=>c.email).join(", "),e.target,"Copy emails");
 document.getElementById("copy-csv").onclick=e=>copyText("Name,Email,Phone\n"+built.custs.map(c=>`${c.name},${c.email},${fmtPhone(c.phone)}`).join("\n"),e.target,"Copy name, email, phone");
+
+
+const money=v=>"$"+Number(v).toFixed(2);
+function paymentInfo(c){
+ const record=checks[`c_${c.key}_receipt`];
+ const paid=record?Number(record.amount):checks[`c_${c.key}_paid`]?c.total:0;
+ const balance=Math.max(0,c.total-paid);
+ const review=!!record?.review||paid>0&&balance>0;
+ return {paid,balance,record,status:review?"review":paid>=c.total?"paid":"unpaid"};
+}
+function allPrinted(c){
+ const rows=Object.values(built.items).flatMap(g=>Object.values(g).flat()).filter(r=>r.cust===c.key);
+ return rows.length>0&&rows.every(r=>checks[`${r.label.startsWith("crew")?"crew":"v"}_${r.id}_printed`]);
+}
+function reminderMail(c){
+ const body=`Hi ${c.name.split(" ")[0]},\n\nYour I Bike Roslindale order is recorded, but I haven't matched a payment yet.\nOrder: ${c.lines.join(", ")}\nAmount due: ${money(paymentInfo(c).balance)}\n\nYou can pay in person at Seymore Green, 35 Poplar St, Monday–Saturday, 10–6. If you already paid, reply with the payment method and date so I can check it.\n\nThank you!\nSeymore Green`;
+ return `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent("Payment check: I Bike Roslindale order")}&body=${encodeURIComponent(body)}`;
+}
+function renderPaymentGroups(custs){
+ let collected=0,unmatched=0,reviewBalance=0;
+ const groups={paid:[],unpaid:[],review:[]};
+ custs.forEach(c=>{const p=paymentInfo(c);groups[p.status].push(c);collected+=Math.min(p.paid,c.total);if(p.status==="unpaid")unmatched+=p.balance;else reviewBalance+=p.balance;});
+ const total=custs.reduce((s,c)=>s+c.total,0);
+ document.getElementById("payment-summary").textContent=`Order value: ${money(total)} · Paid toward listed orders: ${money(collected)} · No matched payment: ${money(unmatched)} · Balance needing review: ${money(reviewBalance)}`;
+ document.getElementById("prog-cust").textContent=`${groups.paid.length} fully paid · ${groups.unpaid.length} no matched payment · ${groups.review.length} review`;
+ document.getElementById("payment-groups").innerHTML=["unpaid","review","paid"].map(g=>`<div class="pay-group ${g}"><h3>${{paid:"Paid — pickup email when ready",unpaid:"No matching payment — needs payment email",review:"Partial payment / needs review"}[g]} (${groups[g].length})</h3><div class="tbl-wrap"><table><thead><tr><th>Customer / order</th><th>Order</th><th>Paid</th><th>Balance</th><th>Status / method</th><th>Email sent</th><th>Picked up</th></tr></thead><tbody>${groups[g].map(c=>{
+ const p=paymentInfo(c),ready=allPrinted(c),friday=new Date()>=new Date("2026-10-16T00:00:00-04:00");
+ const note=p.record?.note||"";
+ const action=g==="unpaid"?`<a class="mail" href="${reminderMail(c)}">Draft payment reminder</a>`:g==="paid"&&ready&&friday?`<a class="mail" href="${pickupMail(c)}">Draft ready-for-pickup email</a>`:g==="paid"?"<span class='note'>Pickup email on Friday once all items are printed</span>":"<span class='note'>Resolve order/payment before pickup email</span>";
+ return `<tr data-row><td><b>${esc(c.name)}</b><br><span class="items">${esc(c.lines.join(" · "))}</span><br><span class="contact">${esc(c.email)} · ${esc(fmtPhone(c.phone))}</span><br>${action}${note?`<p class="recon-note">${esc(note)}</p>`:""}</td><td>${money(c.total)}</td><td>${money(p.paid)}</td><td>${money(p.balance)}</td><td>${box(`c_${c.key}_paid`,`Payment verified: ${c.name}`)}<br><span class="pay-badge">${g==="paid"?"Paid":g==="review"?"Review":"No match"}</span><br><select data-method="${esc(c.key)}" aria-label="Payment method for ${esc(c.name)}"><option value="">Not recorded</option>${["Venmo","Cash App","PayPal","In Person","Other"].map(m=>`<option ${checks[`c_${c.key}_method`]===m?"selected":""}>${m}</option>`).join("")}</select></td><td>${box(`c_${c.key}_emailed`,`Pickup email actually sent: ${c.name}`)}<div class="note">Pickup</div>${box(`c_${c.key}_reminded`,`Payment reminder actually sent: ${c.name}`)}<div class="note">Payment</div></td><td>${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`;
+ }).join("")||'<tr><td colspan="7">None</td></tr>'}</tbody></table></div></div>`).join("");
+ const extras=checks.reconciliation_extras||[];
+ document.getElementById("recon-extras").innerHTML=extras.length?`<p class="recon-note"><b>Payments without a matching order</b><br>${extras.map(x=>esc(x.name)+" — "+money(x.amount)+" — "+esc(x.note||"")).join("<br>")}</p>`:"";
+}
+document.getElementById("import-payments").onclick=()=>document.getElementById("payment-file").click();
+document.getElementById("payment-file").onchange=async e=>{
+ const el=document.getElementById("import-status");
+ try{
+  if(!pin||!built?.custs.length)throw new Error("Open the app with your PIN and refresh orders first.");
+  const f=e.target.files[0];if(!f)return;
+  const data=JSON.parse(await f.text());
+  if(data.format!=="rozzie-reconciliation-v1"||!Array.isArray(data.payments))throw new Error("Choose the Rozzie verified-payments JSON file.");
+  const batch={},unmatched=[...(data.extras||[])];let matches=0;
+  for(const r of data.payments){
+   if(!r.email||!Number.isFinite(r.amount)||r.amount<0)throw new Error("Invalid payment record.");
+   const c=built.custs.find(c=>c.email.toLowerCase()===r.email.toLowerCase());
+   if(!c){unmatched.push({...r,note:r.note||"No matching order"});continue;}
+   const k="c_"+c.key;
+   batch[k+"_receipt"]=r;batch[k+"_method"]=r.method;batch[k+"_paid"]=r.amount>=c.total&&!r.review;
+   matches++;
+  }
+  batch.reconciliation_extras=unmatched;
+  const saved=await api("/api/checks",{method:"POST",body:JSON.stringify(batch)});
+  checks={...saved,...pending};ls.set(LS.checks,checks);render();
+  el.textContent=`Saved verified payments for ${matches} customers. Repeating this import replaces the same records; it does not double-count them.`;
+ }catch(err){el.textContent="Import not saved: "+err.message;}finally{e.target.value="";}
+};
 
 // ---- PIN lock ----
 const lockEl=document.getElementById("lock");
