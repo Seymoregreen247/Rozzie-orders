@@ -116,7 +116,7 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
 
   <section>
     <div class="sec-head"><h2>Customers</h2><span class="prog" id="prog-cust"></span></div>
-    <p class="note">Orders are NOT payments. Verify money received before checking Paid. Select the payment method only after verifying receipt. Unpaid orders must not be sent to production.</p>
+    <p class="note">Paid customers are listed first, by payment received date (oldest first). Enter the actual receipt date from Venmo, PayPal, Cash App, or your cash record. Missing dates need checking; they are never guessed. Orders are NOT payments. Verify money received before checking Paid. Select the payment method only after verifying receipt. Unpaid orders must not be sent to production.</p>
     <div class="tools"><button id="show-unpaid" type="button">Show unpaid only</button><button id="show-all" type="button">Show all customers</button></div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Customer</th><th>Total</th><th class="chk">Paid (verified)</th><th>Method</th><th class="chk">Emailed</th><th class="chk">Picked up</th></tr></thead>
@@ -177,9 +177,10 @@ function build(){
   const items={crew:{},vneck:{}}, custs=new Map();
   orders.forEach(o=>{
     const key=safe(o.email||o.name), isNew=!firstLoad&&!seenIds.has(o.id);
-    if(!custs.has(key)) custs.set(key,{key,name:o.name,email:o.email,phone:o.phone,lines:[],total:0,isNew:false,ship:false,interest:new Set()});
+    if(!custs.has(key)) custs.set(key,{key,name:o.name,email:o.email,phone:o.phone,lines:[],total:0,isNew:false,ship:false,received:[],interest:new Set()});
     String(o.interest||"").split(",").map(x=>x.trim()).filter(Boolean).forEach(x=>custs.get(key).interest.add(x));
     const c=custs.get(key);
+    if(o.created)c.received.push(o.created);
     if(isNew) c.isNew=true;
     if(/ship/i.test(o.fulfillment)) c.ship=true;
     o.lines.forEach((ln,li)=>{
@@ -300,6 +301,11 @@ async function loadAll(){
 refreshBtn.onclick=loadAll;
 
 document.addEventListener("change",e=>{
+  if(e.target.matches("input[data-paid-date]")){
+    const v=e.target.value;
+    if(v&&!validDate(v)){alert("Enter a valid payment date.");return}
+    persist(`c_${e.target.dataset.paidDate}_paid_date`,v);render();return;
+  }
   if(e.target.matches("select[data-method]")){persist(`c_${e.target.dataset.method}_method`,e.target.value);return}
   if(e.target.matches("input[type=checkbox][data-k]")){
     const k=e.target.dataset.k;
@@ -343,19 +349,33 @@ function reminderMail(c){
  const body=`Hi ${c.name.split(" ")[0]},\n\nYour I Bike Roslindale order is recorded, but I haven't matched a payment yet.\nOrder: ${c.lines.join(", ")}\nAmount due: ${money(paymentInfo(c).balance)}\n\nYou can pay in person at Seymore Green, 35 Poplar St, Monday–Saturday, 10–6. If you already paid, reply with the payment method and date so I can check it.\n\nThank you!\nSeymore Green`;
  return `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent("Payment check: I Bike Roslindale order")}&body=${encodeURIComponent(body)}`;
 }
+function validDate(v){return typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v+"T12:00:00Z"))&&new Date(v+"T12:00:00Z").toISOString().slice(0,10)===v}
+function paidDate(c){
+ const override=checks[`c_${c.key}_paid_date`];
+ if(validDate(override))return override;
+ const r=paymentInfo(c).record;
+ const value=r?.paid_date||r?.payment_date||r?.date;
+ return validDate(value)?value:"";
+}
+function receivedText(c){return c.received.map(v=>new Date(v)).filter(d=>!isNaN(d)).sort((a,b)=>a-b).map(d=>d.toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})).join("; ")||"Not recorded"}
+function paymentOrder(a,b){
+ const ad=paidDate(a),bd=paidDate(b);
+ return Number(!!checks[`c_${a.key}_picked`])-Number(!!checks[`c_${b.key}_picked`])||(ad||"9999").localeCompare(bd||"9999")||a.name.localeCompare(b.name);
+}
 function renderPaymentGroups(custs){
  let collected=0,unmatched=0,reviewBalance=0;
  const groups={paid:[],unpaid:[],review:[]};
  custs.forEach(c=>{const p=paymentInfo(c);groups[p.status].push(c);collected+=Math.min(p.paid,c.total);if(p.status==="unpaid")unmatched+=p.balance;else reviewBalance+=p.balance;});
+ groups.paid.sort(paymentOrder);
  const total=custs.reduce((s,c)=>s+c.total,0);
  document.getElementById("payment-summary").textContent=`Order value: ${money(total)} · Paid toward listed orders: ${money(collected)} · No matched payment: ${money(unmatched)} · Balance needing review: ${money(reviewBalance)}`;
  document.getElementById("prog-cust").textContent=`${groups.paid.length} fully paid · ${groups.unpaid.length} no matched payment · ${groups.review.length} review`;
- document.getElementById("payment-groups").innerHTML=["unpaid","review","paid"].map(g=>`<div class="pay-group ${g}"><h3>${{paid:"Paid — pickup email when ready",unpaid:"No matching payment — needs payment email",review:"Partial payment / needs review"}[g]} (${groups[g].length})</h3><div class="tbl-wrap"><table><thead><tr><th>Customer / order</th><th>Order</th><th>Paid</th><th>Balance</th><th>Status / method</th><th>Email sent</th><th>Picked up</th></tr></thead><tbody>${groups[g].map(c=>{
+ document.getElementById("payment-groups").innerHTML=(unpaidOnly?["unpaid","review"]:["paid","review","unpaid"]).map(g=>`<div class="pay-group ${g}"><h3>${{paid:"Paid — oldest payment first; picked-up orders last",unpaid:"No matching payment — needs payment email",review:"Partial payment / needs review"}[g]} (${groups[g].length})</h3><div class="tbl-wrap"><table><thead><tr><th>Customer / order</th><th>Dates received (Eastern)</th><th>Order</th><th>Paid</th><th>Balance</th><th>Status / method</th><th>Email sent</th><th>Picked up</th></tr></thead><tbody>${groups[g].map(c=>{
  const p=paymentInfo(c),ready=allPrinted(c),friday=new Date()>=new Date("2026-10-16T00:00:00-04:00");
  const note=p.record?.note||"";
  const action=g==="unpaid"?`<a class="mail" href="${reminderMail(c)}">Draft payment reminder</a>`:g==="paid"&&ready&&friday?`<a class="mail" href="${pickupMail(c)}">Draft ready-for-pickup email</a>`:g==="paid"?"<span class='note'>Pickup email on Friday once all items are printed</span>":"<span class='note'>Resolve order/payment before pickup email</span>";
- return `<tr data-row><td><b>${esc(c.name)}</b><br><span class="items">${esc(c.lines.join(" · "))}</span><br><span class="contact">${esc(c.email)} · ${esc(fmtPhone(c.phone))}</span><br>${action}${note?`<p class="recon-note">${esc(note)}</p>`:""}</td><td>${money(c.total)}</td><td>${money(p.paid)}</td><td>${money(p.balance)}</td><td>${box(`c_${c.key}_paid`,`Payment verified: ${c.name}`)}<br><span class="pay-badge">${g==="paid"?"Paid":g==="review"?"Review":"No match"}</span><br><select data-method="${esc(c.key)}" aria-label="Payment method for ${esc(c.name)}"><option value="">Not recorded</option>${["Venmo","Cash App","PayPal","In Person","Other"].map(m=>`<option ${checks[`c_${c.key}_method`]===m?"selected":""}>${m}</option>`).join("")}</select></td><td>${box(`c_${c.key}_emailed`,`Pickup email actually sent: ${c.name}`)}<div class="note">Pickup</div>${box(`c_${c.key}_reminded`,`Payment reminder actually sent: ${c.name}`)}<div class="note">Payment</div></td><td>${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`;
- }).join("")||'<tr><td colspan="7">None</td></tr>'}</tbody></table></div></div>`).join("");
+ return `<tr data-row><td><b>${esc(c.name)}</b><br><span class="items">${esc(c.lines.join(" · "))}</span><br><span class="contact">${esc(c.email)} · ${esc(fmtPhone(c.phone))}</span><br>${action}${note?`<p class="recon-note">${esc(note)}</p>`:""}</td><td><div class="note">Order received: ${esc(receivedText(c))}</div><label>Payment received<input type="date" data-paid-date="${esc(c.key)}" value="${esc(paidDate(c))}" aria-label="Payment received date for ${esc(c.name)}"></label><div class="note">${paidDate(c)?"Receipt date":"Date missing — verify receipt"}</div></td><td>${money(c.total)}</td><td>${money(p.paid)}</td><td>${money(p.balance)}</td><td>${box(`c_${c.key}_paid`,`Payment verified: ${c.name}`)}<br><span class="pay-badge">${g==="paid"?"Paid":g==="review"?"Review":"No match"}</span><br><select data-method="${esc(c.key)}" aria-label="Payment method for ${esc(c.name)}"><option value="">Not recorded</option>${["Venmo","Cash App","PayPal","In Person","Other"].map(m=>`<option ${checks[`c_${c.key}_method`]===m?"selected":""}>${m}</option>`).join("")}</select></td><td>${box(`c_${c.key}_emailed`,`Pickup email actually sent: ${c.name}`)}<div class="note">Pickup</div>${box(`c_${c.key}_reminded`,`Payment reminder actually sent: ${c.name}`)}<div class="note">Payment</div></td><td>${box(`c_${c.key}_picked`,`Picked up: ${c.name}`)}</td></tr>`;
+ }).join("")||'<tr><td colspan="8">None</td></tr>'}</tbody></table></div></div>`).join("");
  const extras=checks.reconciliation_extras||[];
  document.getElementById("recon-extras").innerHTML=extras.length?`<p class="recon-note"><b>Payments without a matching order</b><br>${extras.map(x=>esc(x.name)+" — "+money(x.amount)+" — "+esc(x.note||"")).join("<br>")}</p>`:"";
 }
