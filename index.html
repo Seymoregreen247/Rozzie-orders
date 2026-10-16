@@ -81,6 +81,7 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
 #lock button{width:100%;background:#F6D24A;border-color:#F6D24A;color:#1c2b22;font-size:1.1rem;padding:10px}
 #lock .err{color:#ffe08a;min-height:1.4em;margin-top:8px}
 .pay-group{border:1px solid var(--line);border-radius:8px;margin-top:14px;overflow:hidden}.pay-group h3{padding:12px;background:var(--row)}.pay-group.paid{border-left:6px solid #27834a}.pay-group.unpaid{border-left:6px solid #bb3838}.pay-group.review{border-left:6px solid #b88014}.pay-badge{font-weight:700}.recon-note{padding:10px;background:var(--warnbg);border-radius:6px}.summary-cards{display:flex;flex-wrap:wrap;gap:12px}.summary-cards div{padding:12px;background:var(--row);border-radius:8px;flex:1;min-width:150px}
+.tally-table{margin:12px 0 20px}.tally-table td,.tally-table th{text-align:center}.tally-table th:first-child{text-align:left;white-space:nowrap}.tally-table td{font-size:1.25rem;font-weight:700}.tally-table tfoot{background:var(--row)}.tally-table caption{text-align:left;font-size:1.3rem;font-weight:700;padding:8px 0}.tally-table .zero{color:var(--muted);font-weight:400}
 </style>
 </head>
 <body>
@@ -97,6 +98,7 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
     <button onclick="window.print()">Print checklist</button>
   </div>
 
+  <section id="shirt-tally"><div class="sec-head"><h2>Shirt tally by color &amp; size</h2></div><div class="tools"><label>Count <select id="tally-mode"><option value="all">All ordered shirts</option><option value="paid">Paid shirts only</option></select></label></div><div id="tally-tables"></div></section>
   <section id="payment-panel"><div class="sec-head"><h2>Payments &amp; customer emails</h2></div>
 <p class="note">Import the private reconciliation file once to apply verified payments. Repeat imports do not add payments twice.</p>
 <div class="tools"><button id="import-payments">Import verified payments</button><input id="payment-file" type="file" accept=".json,application/json" hidden></div>
@@ -202,6 +204,28 @@ function alsoText(r,multi){
   const txt=Object.keys(c).map(l=>(c[l]>1?c[l]+"× ":"")+l).join(", ");
   return `<div class="also">+ also: ${esc(txt)}</div>`;
 }
+
+function renderTally(){
+ const paidOnly=document.getElementById("tally-mode").value==="paid";
+ const eligible=new Set(built.custs.filter(c=>!paidOnly||paymentInfo(c).status==="paid").map(c=>c.key));
+ const canonicalSize=s=>({"XXL":"2XL","XXXL":"3XL"}[s]||s);
+ document.getElementById("tally-tables").innerHTML=["crew","vneck"].map(style=>{
+   const groups=built.items[style], colors=Object.keys(groups).sort();
+   const used=new Set(Object.values(groups).flat().filter(r=>eligible.has(r.cust)).map(r=>canonicalSize(r.size)));
+   const sizes=[...new Set([...SIZE_ORDER.map(canonicalSize),...used])].filter(s=>used.has(s));
+   if(!sizes.length)return '<p class="note">'+(style==="crew"?"Unisex crew":"Ladies’ V-neck")+': No '+(paidOnly?"paid ":"")+'shirts.</p>';
+   const totals=Object.fromEntries(sizes.map(s=>[s,0]));
+   const rows=colors.map(color=>{
+     const counts=Object.fromEntries(sizes.map(s=>[s,0]));
+     groups[color].filter(r=>eligible.has(r.cust)).forEach(r=>{counts[canonicalSize(r.size)]++;totals[canonicalSize(r.size)]++});
+     const total=Object.values(counts).reduce((a,b)=>a+b,0);
+     return total?`<tr><th scope="row">${esc(color)}</th>${sizes.map(s=>`<td class="${counts[s]?"":"zero"}">${counts[s]}</td>`).join("")}<td>${total}</td></tr>`:"";
+   }).join("");
+   return `<div class="tbl-wrap"><table class="tally-table"><caption>${style==="crew"?"Unisex crew":"Ladies’ V-neck"} — ${paidOnly?"paid shirts only":"all ordered shirts"}</caption><thead><tr><th scope="col">Color</th>${sizes.map(s=>`<th scope="col">${esc(s)}</th>`).join("")}<th scope="col">Total</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th scope="row">Total</th>${sizes.map(s=>`<td>${totals[s]}</td>`).join("")}<td>${Object.values(totals).reduce((a,b)=>a+b,0)}</td></tr></tfoot></table></div>`;
+ }).join("");
+}
+document.getElementById("tally-mode").onchange=renderTally;
+
 function renderGroups(el,groups,prefix,cols,multi){
   const colors=Object.keys(groups);
   if(!colors.length){el.innerHTML='<div class="empty">No shirts in this section yet.</div>';return}
@@ -237,6 +261,7 @@ let built=null;
 function render(){
   built=build();
   const {items,custs}=built;
+  renderTally();
   const counts={};
   Object.values(items).forEach(g=>Object.values(g).forEach(rows=>rows.forEach(r=>counts[r.cust]=(counts[r.cust]||0)+1)));
   const byCust={};
