@@ -82,6 +82,22 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
 #lock .err{color:#ffe08a;min-height:1.4em;margin-top:8px}
 .pay-group{border:1px solid var(--line);border-radius:8px;margin-top:14px;overflow:hidden}.pay-group h3{padding:12px;background:var(--row)}.pay-group.paid{border-left:6px solid #27834a}.pay-group.unpaid{border-left:6px solid #bb3838}.pay-group.review{border-left:6px solid #b88014}.pay-badge{font-weight:700}.recon-note{padding:10px;background:var(--warnbg);border-radius:6px}.summary-cards{display:flex;flex-wrap:wrap;gap:12px}.summary-cards div{padding:12px;background:var(--row);border-radius:8px;flex:1;min-width:150px}
 .tally-table{margin:12px 0 20px}.tally-table td,.tally-table th{text-align:center}.tally-table th:first-child{text-align:left;white-space:nowrap}.tally-table td{font-size:1.25rem;font-weight:700}.tally-table tfoot{background:var(--row)}.tally-table caption{text-align:left;font-size:1.3rem;font-weight:700;padding:8px 0}.tally-table .zero{color:var(--muted);font-weight:400}
+
+@media(max-width:700px){
+.pay-group .tbl-wrap{overflow:visible}
+.pay-group table,.pay-group tbody,.pay-group tr,.pay-group td{display:block;width:100%}
+.pay-group thead{display:none}
+.pay-group tr{padding:12px;border-bottom:2px solid var(--line)}
+.pay-group td{padding:4px 0;border:0;overflow-wrap:anywhere}
+.pay-group td:first-child b{font-size:1.15rem}
+.pay-group td:nth-child(3)::before{content:"Order: "}
+.pay-group td:nth-child(4)::before{content:"Paid: "}
+.pay-group td:nth-child(5)::before{content:"Balance: "}
+.pay-group td:nth-child(7)::before{content:"Emails actually sent: ";font-weight:bold}
+.pay-group td:nth-child(8)::before{content:"Picked up: "}
+.pay-group input[type=date]{max-width:100%;display:block;font:inherit}
+}
+.plan-entry{width:65px;font:inherit;padding:6px}
 </style>
 </head>
 <body>
@@ -93,18 +109,18 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
   <div class="totals" id="totals"></div>
   <p class="note" id="payment-summary" aria-live="polite"></p>
   <div class="sync" id="sync"><span class="dot"></span><span id="sync-text">Loading orders…</span></div>
-  <div class="tools">
+  <div class="tools"><button onclick="document.getElementById(\'payment-panel\').scrollIntoView()">Who needs a payment email?</button>
     <button class="primary" id="refresh">Refresh orders</button>
     <button onclick="window.print()">Print checklist</button>
   </div>
 
-  <section id="shirt-tally"><div class="sec-head"><h2>Shirt tally by color &amp; size</h2></div><div class="tools"><label>Count <select id="tally-mode"><option value="all">All ordered shirts</option><option value="paid">Paid shirts only</option></select></label></div><div id="tally-tables"></div></section>
+  <section id="shirt-tally"><div class="sec-head"><h2>Shirt tally by color &amp; size</h2></div><div class="tools"><label>Count <select id="tally-mode"><option value="unpaid" selected>Unpaid / no matched payment</option><option value="remaining">Unpaid — still to make</option><option value="review">Payment / order review</option><option value="all">All ordered shirts</option><option value="paid">Paid shirts only</option></select></label></div><p class="note">Unpaid totals help you plan ahead. Review orders are separate. A missing payment date alone does not mean unpaid.</p><div id="tally-tables"></div><div id="production-plan"></div></section>
   <section id="payment-panel"><div class="sec-head"><h2>Payments &amp; customer emails</h2></div>
 <p class="note">Import the private reconciliation file once to apply verified payments. Repeat imports do not add payments twice.</p>
 <div class="tools"><button id="import-payments">Import verified payments</button><input id="payment-file" type="file" accept=".json,application/json" hidden></div>
 <p id="import-status" class="note" role="status"></p>
 <p class="recon-note">Pickup emails: wait until Friday, October 16, and confirm every item in the customer's order is printed. Opening an email draft does not mark it sent.</p>
-<div id="recon-extras"></div><div id="payment-groups"></div></section>
+<div class="tools"><button id="copy-unpaid">Copy emails needing a payment reminder</button></div><p class="note">Only customers with no matched payment appear in this reminder list. Review customers stay separate. Tick “Payment” only after you send the reminder.</p><div id="recon-extras"></div><div id="payment-groups"></div></section>
 <section>
     <div class="sec-head"><h2>Unisex crew</h2><span class="prog" id="prog-crew"></span></div>
     <div id="crew"></div>
@@ -118,7 +134,7 @@ textarea{width:100%;min-height:90px;font:inherit;font-size:.88rem;border:1px sol
 
   <section>
     <div class="sec-head"><h2>Customers</h2><span class="prog" id="prog-cust"></span></div>
-    <p class="note">Paid customers are listed first, by payment received date (oldest first). Enter the actual receipt date from Venmo, PayPal, Cash App, or your cash record. Missing dates need checking; they are never guessed. Orders are NOT payments. Verify money received before checking Paid. Select the payment method only after verifying receipt. Unpaid orders must not be sent to production.</p>
+    <p class="note">Paid customers are listed first, by payment received date (oldest first). Enter the actual receipt date from Venmo, PayPal, Cash App, or your cash record. Missing dates need checking; they are never guessed. Orders are NOT payments. Verify money received before checking Paid. Select the payment method only after verifying receipt. Use unpaid orders to plan stock ahead; verify payment before releasing an order.</p>
     <div class="tools"><button id="show-unpaid" type="button">Show unpaid only</button><button id="show-all" type="button">Show all customers</button></div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Customer</th><th>Total</th><th class="chk">Paid (verified)</th><th>Method</th><th class="chk">Emailed</th><th class="chk">Picked up</th></tr></thead>
@@ -151,7 +167,7 @@ const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.par
 
 let pin=ls.get(LS.pin,""), orders=ls.get(LS.orders,[]), checks=ls.get(LS.checks,{});
 let seenIds=new Set(ls.get(LS.seen,[])), firstLoad=seenIds.size===0;
-let unpaidOnly=false;
+let unpaidOnly=true;
 
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const safe=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,"_");
@@ -206,23 +222,26 @@ function alsoText(r,multi){
 }
 
 function renderTally(){
- const paidOnly=document.getElementById("tally-mode").value==="paid";
- const eligible=new Set(built.custs.filter(c=>!paidOnly||paymentInfo(c).status==="paid").map(c=>c.key));
+ const mode=document.getElementById("tally-mode").value, paidOnly=mode==="paid";
+ const eligible=new Set(built.custs.filter(c=>mode==="all"||(mode==="remaining"?paymentInfo(c).status==="unpaid":paymentInfo(c).status===mode)).map(c=>c.key));
+ const include=r=>eligible.has(r.cust)&&(mode!=="remaining"||!checks[(r.label.startsWith("crew")?"crew":"v")+"_"+r.id+"_printed"]);
+ const modeLabel={all:"all ordered shirts",paid:"paid shirts only",unpaid:"unpaid / no matched payment",remaining:"unpaid shirts not marked printed",review:"payment / order review"}[mode];
  const canonicalSize=s=>({"XXL":"2XL","XXXL":"3XL"}[s]||s);
  document.getElementById("tally-tables").innerHTML=["crew","vneck"].map(style=>{
    const groups=built.items[style], colors=Object.keys(groups).sort();
-   const used=new Set(Object.values(groups).flat().filter(r=>eligible.has(r.cust)).map(r=>canonicalSize(r.size)));
+   const used=new Set(Object.values(groups).flat().filter(include).map(r=>canonicalSize(r.size)));
    const sizes=[...new Set([...SIZE_ORDER.map(canonicalSize),...used])].filter(s=>used.has(s));
-   if(!sizes.length)return '<p class="note">'+(style==="crew"?"Unisex crew":"Ladies’ V-neck")+': No '+(paidOnly?"paid ":"")+'shirts.</p>';
+   if(!sizes.length)return '<p class="note">'+(style==="crew"?"Unisex crew":"Ladies’ V-neck")+': No '+(modeLabel+" ")+'shirts.</p>';
    const totals=Object.fromEntries(sizes.map(s=>[s,0]));
    const rows=colors.map(color=>{
      const counts=Object.fromEntries(sizes.map(s=>[s,0]));
-     groups[color].filter(r=>eligible.has(r.cust)).forEach(r=>{counts[canonicalSize(r.size)]++;totals[canonicalSize(r.size)]++});
+     groups[color].filter(include).forEach(r=>{counts[canonicalSize(r.size)]++;totals[canonicalSize(r.size)]++});
      const total=Object.values(counts).reduce((a,b)=>a+b,0);
      return total?`<tr><th scope="row">${esc(color)}</th>${sizes.map(s=>`<td class="${counts[s]?"":"zero"}">${counts[s]}</td>`).join("")}<td>${total}</td></tr>`:"";
    }).join("");
-   return `<div class="tbl-wrap"><table class="tally-table"><caption>${style==="crew"?"Unisex crew":"Ladies’ V-neck"} — ${paidOnly?"paid shirts only":"all ordered shirts"}</caption><thead><tr><th scope="col">Color</th>${sizes.map(s=>`<th scope="col">${esc(s)}</th>`).join("")}<th scope="col">Total</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th scope="row">Total</th>${sizes.map(s=>`<td>${totals[s]}</td>`).join("")}<td>${Object.values(totals).reduce((a,b)=>a+b,0)}</td></tr></tfoot></table></div>`;
+   return `<div class="tbl-wrap"><table class="tally-table"><caption>${style==="crew"?"Unisex crew":"Ladies’ V-neck"} — ${modeLabel}</caption><thead><tr><th scope="col">Color</th>${sizes.map(s=>`<th scope="col">${esc(s)}</th>`).join("")}<th scope="col">Total</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th scope="row">Total</th>${sizes.map(s=>`<td>${totals[s]}</td>`).join("")}<td>${Object.values(totals).reduce((a,b)=>a+b,0)}</td></tr></tfoot></table></div>`;
  }).join("");
+ renderPlan();
 }
 document.getElementById("tally-mode").onchange=renderTally;
 
@@ -335,15 +354,8 @@ document.addEventListener("change",e=>{
   if(e.target.matches("input[type=checkbox][data-k]")){
     const k=e.target.dataset.k;
     if(k.endsWith("_paid")&&e.target.checked&&!confirm("Have you personally verified this payment was RECEIVED? A submitted order or Venmo link click is not proof.")){e.target.checked=false;return}
-    if((k.startsWith("crew_")||k.startsWith("v_"))&&e.target.checked){
-      const rowId=k.replace(/^(crew_|v_)/,"").replace(/_(ordered|printed)$/,"");
-      const shirtRows=built?Object.values(built.items).flatMap(g=>Object.values(g).flat()):[];
-      const shirt=shirtRows.find(r=>r.id===rowId);
-      const match=shirt&&built.custs.find(c=>c.key===shirt.cust);
-      if(match&&paymentInfo(match).status!=="paid"){alert("Payment not verified. Do not order or print this shirt yet.");e.target.checked=false;return}
-    }
     if(k.endsWith("_paid")&&checks[k.replace(/_paid$/,"_receipt")]){alert("This status comes from an imported receipt. Update the payment reconciliation to change its amount or review status.");render();return;}
-    persist(k,e.target.checked);if(k.endsWith("_paid"))render();else refreshMarks();
+    persist(k,e.target.checked);if(k.endsWith("_paid"))render();else {refreshMarks();renderTally();}
   }
 });
 document.getElementById("show-unpaid").onclick=()=>{unpaidOnly=true;render()};
@@ -395,7 +407,7 @@ function renderPaymentGroups(custs){
  const total=custs.reduce((s,c)=>s+c.total,0);
  document.getElementById("payment-summary").textContent=`Order value: ${money(total)} · Paid toward listed orders: ${money(collected)} · No matched payment: ${money(unmatched)} · Balance needing review: ${money(reviewBalance)}`;
  document.getElementById("prog-cust").textContent=`${groups.paid.length} fully paid · ${groups.unpaid.length} no matched payment · ${groups.review.length} review`;
- document.getElementById("payment-groups").innerHTML=(unpaidOnly?["unpaid","review"]:["paid","review","unpaid"]).map(g=>`<div class="pay-group ${g}"><h3>${{paid:"Paid — oldest payment first; picked-up orders last",unpaid:"No matching payment — needs payment email",review:"Partial payment / needs review"}[g]} (${groups[g].length})</h3><div class="tbl-wrap"><table><thead><tr><th>Customer / order</th><th>Dates received (Eastern)</th><th>Order</th><th>Paid</th><th>Balance</th><th>Status / method</th><th>Email sent</th><th>Picked up</th></tr></thead><tbody>${groups[g].map(c=>{
+ document.getElementById("payment-groups").innerHTML=(unpaidOnly?["unpaid","review"]:["paid","review","unpaid"]).map(g=>`<div class="pay-group ${g}"><h3>${{paid:"Paid — oldest payment first; picked-up orders last",unpaid:"No matched payment — check receipt or send reminder",review:"Check first — partial payment / possible duplicate"}[g]} (${groups[g].length})</h3><div class="tbl-wrap"><table><thead><tr><th>Customer / order</th><th>Dates received (Eastern)</th><th>Order</th><th>Paid</th><th>Balance</th><th>Status / method</th><th>Email sent</th><th>Picked up</th></tr></thead><tbody>${groups[g].map(c=>{
  const p=paymentInfo(c),ready=allPrinted(c),friday=new Date()>=new Date("2026-10-16T00:00:00-04:00");
  const note=p.record?.note||"";
  const action=g==="unpaid"?`<a class="mail" href="${reminderMail(c)}">Draft payment reminder</a>`:g==="paid"&&ready&&friday?`<a class="mail" href="${pickupMail(c)}">Draft ready-for-pickup email</a>`:g==="paid"?"<span class='note'>Pickup email on Friday once all items are printed</span>":"<span class='note'>Resolve order/payment before pickup email</span>";
@@ -427,6 +439,26 @@ document.getElementById("payment-file").onchange=async e=>{
   el.textContent=`Saved verified payments for ${matches} customers. Repeating this import replaces the same records; it does not double-count them.`;
  }catch(err){el.textContent="Import not saved: "+err.message;}finally{e.target.value="";}
 };
+
+
+function renderPlan(){
+ const rows=Object.values(built.items).flatMap(g=>Object.values(g).flat()).filter(r=>{
+  const c=built.custs.find(c=>c.key===r.cust);
+  return paymentInfo(c).status==="unpaid"&&!checks[(r.label.startsWith("crew")?"crew":"v")+"_"+r.id+"_printed"];
+ });
+ const groups={};
+ rows.forEach(r=>{const label=r.label.replace(/XXXL$/,"3XL").replace(/XXL$/,"2XL");groups[label]=(groups[label]||0)+1});
+ document.getElementById("production-plan").innerHTML='<h2>Unpaid orders — stock to check / buy</h2><p class="note">Counts exclude shirts already marked Printed. Enter spare matching finished shirts and unused blanks available for these unpaid orders only. Do not include stock reserved for paid customers. Planning stock does not mark anyone paid.</p>'+Object.keys(groups).sort().map(label=>{
+  const key="plan_"+safe(label),ready=Number(checks[key+"_ready"]||0),blank=Number(checks[key+"_blank"]||0),need=groups[label],make=Math.max(0,need-ready),buy=Math.max(0,make-blank);
+  return '<div class="list-box"><b>'+esc(label)+'</b><p>Outstanding: '+need+'</p><label>Spare finished <input class="plan-entry" type="number" min="0" step="1" data-stock="'+key+'_ready" value="'+ready+'"></label> <label>Unused blanks <input class="plan-entry" type="number" min="0" step="1" data-stock="'+key+'_blank" value="'+blank+'"></label><p><b>Still to make: '+make+' · Buy blanks: '+buy+'</b></p></div>';
+ }).join("")+(rows.length?"":'<p class="note">No unpaid shirts remain unprinted.</p>');
+}
+document.addEventListener("change",e=>{
+ if(e.target.matches("input[data-stock]")){
+ const n=Math.max(0,Math.floor(Number(e.target.value)||0));persist(e.target.dataset.stock,n);renderPlan();
+ }
+});
+document.getElementById("copy-unpaid").onclick=e=>copyText(built.custs.filter(c=>paymentInfo(c).status==="unpaid"&&!checks["c_"+c.key+"_reminded"]).map(c=>c.email).filter(Boolean).join(", "),e.target,"Copy emails needing a payment reminder");
 
 // ---- PIN lock ----
 const lockEl=document.getElementById("lock");
